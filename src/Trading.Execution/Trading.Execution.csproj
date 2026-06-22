@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Order execution: the service that ties the risk gate + exchange filters to an adapter, a paper
+       simulator (default, no keys), and a signed Binance testnet adapter. Depends on Core + Risk. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.Core\Trading.Core.csproj" />
+    <ProjectReference Include="..\Trading.Risk\Trading.Risk.csproj" />
+  </ItemGroup>
+
+</Project>

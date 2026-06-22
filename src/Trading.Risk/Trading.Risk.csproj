@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Deterministic risk layer: limits + the gate that approves/adjusts/vetoes a decision before it
+       can reach an execution adapter. Pure logic; depends on Trading.Core contracts only. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.Core\Trading.Core.csproj" />
+  </ItemGroup>
+
+</Project>

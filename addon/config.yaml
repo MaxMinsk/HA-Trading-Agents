@@ -26,6 +26,17 @@ options:
   backfill_days: 30
   spot_klines_url: "https://data-api.binance.vision/api/v3/klines"
   log_level: "Information"
+  # Execution (off by default). Paper needs no keys; binance defaults to the testnet unless binance_live.
+  exec_enabled: false
+  exec_mode: "paper"
+  paper_quote: 10000
+  binance_api_key: ""
+  binance_api_secret: ""
+  binance_live: false
+  max_position_fraction: 0.25
+  max_order_notional: 1000
+  daily_loss_fraction: 0.05
+  kill_switch: false
 schema:
   db_path: str
   bearer_token: password?
@@ -34,3 +45,13 @@ schema:
   backfill_days: int
   spot_klines_url: str?
   log_level: list(Trace|Debug|Information|Warning|Error)
+  exec_enabled: bool
+  exec_mode: list(paper|binance)
+  paper_quote: float
+  binance_api_key: password?
+  binance_api_secret: password?
+  binance_live: bool
+  max_position_fraction: float
+  max_order_notional: float
+  daily_loss_fraction: float
+  kill_switch: bool

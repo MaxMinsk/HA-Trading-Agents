@@ -2,7 +2,7 @@
 
 A **data-first, low-frequency** crypto trading research system on **C#/.NET 9 + Microsoft Agent Framework (MAF)**. MAF orchestrates a team of typed agents (analysts → bull/bear debate → trader → risk reviewer); the edge and correctness come from the data, validation, risk, and execution layers underneath — which we build first.
 
-> **Status:** the data layer (with a backtest harness) is exposed over **MCP** and an agent host consumes it. `Trading.Core` (contracts + the no-look-ahead snapshot invariant), `Trading.Data` (SQLite store, Binance REST + live WebSocket ingestion, snapshots, data-quality), `Trading.Backtest` (strategies + metrics + buy&hold), `Trading.Mcp` (the market-data MCP server / HA add-on with in-process ingestion), and `Trading.Agent` (a relocatable MCP client). 54 tests; `dotnet build -warnaserror` clean. The MAF multi-agent workflow and the risk/execution layer are next. Backlog, sprints, and decisions live in the **Memory MCP** (`domain=development`, project `binance-maf-trader`), not in this repo.
+> **Status:** the data layer (with a backtest harness) is exposed over **MCP**, an agent host consumes it, and a **deterministic risk + execution layer** is exposed as MCP write-tools (paper / Binance testnet). `Trading.Core` (contracts + the no-look-ahead snapshot invariant + execution contracts), `Trading.Data` (SQLite store, Binance REST + live WebSocket ingestion, snapshots, data-quality), `Trading.Backtest` (strategies + metrics + buy&hold), `Trading.Risk` (limits + the gate), `Trading.Execution` (execution service + paper & Binance-testnet adapters), `Trading.Mcp` (the market-data + execution MCP server / HA add-on with in-process ingestion), and `Trading.Agent` (a relocatable MCP client). 87 tests; `dotnet build -warnaserror` clean. The MAF multi-agent workflow is next. Backlog, sprints, and decisions live in the **Memory MCP** (`domain=development`, project `binance-maf-trader`), not in this repo.
 
 ## Why this shape
 
@@ -10,7 +10,7 @@ A **data-first, low-frequency** crypto trading research system on **C#/.NET 9 + 
 - **Baselines before multi-agent** — a rules/single-agent baseline with fees & slippage must be beaten out-of-sample before the multi-agent workflow earns its cost.
 - **Deterministic risk owns the trigger** — the LLM proposes; plain code validates, sizes, gates (stop / daily-loss / kill-switch), and can veto. No live order path without it.
 - **Low-frequency** — 1h/4h/daily decisions; LLM cycles are too slow/expensive for scalping.
-- **Data over MCP** — the data layer runs as a Home Assistant add-on exposing market data via MCP; the agent is a relocatable MCP client (runs locally where Anthropic/OpenAI APIs are reachable, or inside the add-on). Order execution will be MCP write-tools on the server too (TRD-003).
+- **Data over MCP** — the data layer runs as a Home Assistant add-on exposing market data via MCP; the agent is a relocatable MCP client (runs locally where Anthropic/OpenAI APIs are reachable, or inside the add-on). Order execution is MCP write-tools on the server too, behind the risk gate (paper by default, Binance testnet next, live opt-in) — keys never leave the server.
 
 ## Layout
 
@@ -18,11 +18,12 @@ A **data-first, low-frequency** crypto trading research system on **C#/.NET 9 + 
 src/Trading.Core     — storage/vendor-agnostic contracts (Candle, MarketSnapshot, TradeDecision, IStrategy, interfaces)
 src/Trading.Data     — Binance ingestion (REST + live WebSocket), SQLite store, snapshots, data-quality   (TRD-001)
 src/Trading.Backtest — strategies, backtest engine, performance metrics, buy&hold benchmark              (TRD-S2)
-src/Trading.Mcp      — market-data MCP server (HTTP+bearer / stdio) + in-process ingestion; the HA add-on (TRD-S3)
+src/Trading.Risk     — deterministic risk limits + gate (size clamp, daily-loss stop, kill-switch)        (TRD-S4)
+src/Trading.Execution— execution service + paper adapter + Binance testnet adapter (HMAC-signed REST)      (TRD-S4)
+src/Trading.Mcp      — market-data + execution MCP server (HTTP+bearer / stdio) + in-process ingestion     (TRD-S3 / TRD-S4)
 src/Trading.Agent    — relocatable agent host: an MCP client of the data layer (MAF workflow lands in TRD-004)
 src/Trading.Cli      — console host: backfill, stream, backtest                                           (TRD-001 / TRD-S2)
-src/Trading.Risk     — deterministic risk + execution, exposed over MCP (testnet → live)      (TRD-003, planned)
-addon/               — Home Assistant add-on packaging for the data MCP (Dockerfile, config.yaml, run.sh)
+addon/               — Home Assistant add-on packaging for the MCP server (Dockerfile, config.yaml, run.sh)
 tests/Trading.Tests  — unit & integration tests
 ```
 
@@ -67,13 +68,35 @@ TRADING_MCP_URL=http://127.0.0.1:8080/mcp TRADING_BEARER_TOKEN=dev \
   dotnet run --project src/Trading.Agent -- --symbol BTCUSDT --interval 1h
 ```
 
+## Enable execution (paper / Binance testnet)
+
+Execution MCP write-tools (`exec_submit_intent`, `exec_cancel`, `account_balances`) are **off by default**;
+enable them explicitly. Every order runs through the deterministic risk gate server-side. The default
+adapter is the **paper** simulator (no keys); the **Binance** adapter targets the **testnet** unless
+`TRADING_BINANCE_LIVE=true`. Keys are read on the server and never leave it.
+
+```bash
+# paper execution (no keys) — risk gate + simulated fills
+TRADING_TRANSPORT=http TRADING_BEARER_TOKEN=dev TRADING_INGEST=true \
+  TRADING_EXEC_ENABLED=true TRADING_EXEC_MODE=paper TRADING_PAPER_QUOTE=10000 \
+  ASPNETCORE_URLS=http://127.0.0.1:8080 dotnet run --project src/Trading.Mcp
+
+# Binance spot testnet — keys from https://testnet.binance.vision (server-only)
+TRADING_EXEC_ENABLED=true TRADING_EXEC_MODE=binance \
+  TRADING_BINANCE_API_KEY=... TRADING_BINANCE_API_SECRET=... TRADING_BINANCE_LIVE=false \
+  ...
+```
+
+Risk limits are configurable: `TRADING_MAX_POSITION_FRACTION` (0.25), `TRADING_MAX_ORDER_NOTIONAL` (1000),
+`TRADING_DAILY_LOSS_FRACTION` (0.05), `TRADING_ALLOW_SHORTING` (false), `TRADING_KILL_SWITCH` (false).
+
 ## Backlog (in Memory MCP)
 
 ```
 # active sprint board
 notes_search(domain="development", type="backlog_item",
-             filter="payload.project == 'binance-maf-trader' AND payload.sprint == 'TRD-S3'",
+             filter="payload.project == 'binance-maf-trader' AND payload.sprint == 'TRD-S4'",
              includePayload=true)
 ```
 
-Current sprint **TRD-S3 — Market-data MCP add-on + agent client**: the data layer as an HA add-on exposing market data over MCP, in-add-on ingestion, an MCP-client agent host, and build CI. (TRD-S1 data-first and TRD-S2 baseline+backtest are done.)
+Current sprint **TRD-S4 — Risk + execution (MCP write-tools, testnet/paper-first)**: deterministic risk limits + gate, exchange filters, execution service with a paper adapter and a Binance-testnet signed adapter, all exposed as MCP write-tools behind the gate. (TRD-S1 data-first, TRD-S2 baseline+backtest, and TRD-S3 market-data MCP add-on are done.)
