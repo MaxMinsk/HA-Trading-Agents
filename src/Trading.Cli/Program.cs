@@ -1,5 +1,9 @@
 using System.Globalization;
+using Trading.Backtest;
+using Trading.Backtest.Execution;
+using Trading.Backtest.Strategies;
 using Trading.Core.MarketData;
+using Trading.Core.Strategies;
 using Trading.Data.Backfill;
 using Trading.Data.Binance;
 using Trading.Data.Storage;
@@ -38,6 +42,12 @@ var store = new SqliteMarketDataStore(new SqliteConnectionFactory(dbPath));
 if (string.Equals(command, "stream", StringComparison.OrdinalIgnoreCase))
 {
     await RunStreamAsync().ConfigureAwait(false);
+    return 0;
+}
+
+if (string.Equals(command, "backtest", StringComparison.OrdinalIgnoreCase))
+{
+    await RunBacktestAsync().ConfigureAwait(false);
     return 0;
 }
 
@@ -107,6 +117,45 @@ async Task RunStreamAsync()
         cts.Token).ConfigureAwait(false);
 }
 
+async Task RunBacktestAsync()
+{
+    var strategyName = GetOpt(args, "--strategy") ?? "sma";
+    var fast = int.Parse(GetOpt(args, "--fast") ?? "20", CultureInfo.InvariantCulture);
+    var slow = int.Parse(GetOpt(args, "--slow") ?? "50", CultureInfo.InvariantCulture);
+    var days = int.Parse(GetOpt(args, "--days") ?? "120", CultureInfo.InvariantCulture);
+    var feeBps = decimal.Parse(GetOpt(args, "--fee-bps") ?? "7.5", CultureInfo.InvariantCulture);
+    var slipBps = decimal.Parse(GetOpt(args, "--slippage-bps") ?? "2", CultureInfo.InvariantCulture);
+    var cash = decimal.Parse(GetOpt(args, "--cash") ?? "10000", CultureInfo.InvariantCulture);
+    var symbol = symbols[0];
+
+    var now = TimeProvider.System.GetUtcNow();
+    var candles = await store.GetCandlesRangeAsync(symbol, market, interval, now.AddDays(-days), now).ConfigureAwait(false);
+
+    Console.WriteLine($"Backtest {symbol} {market} {interval} | {candles.Count} bars over {days}d | fee {feeBps}bps slip {slipBps}bps cash {cash}");
+    if (candles.Count == 0)
+    {
+        Console.WriteLine("  no candles in the store for this range — run `backfill` first.");
+        return;
+    }
+
+    var strategy = ParseStrategy(strategyName, fast, slow);
+
+    var fees = new FeeModel(feeBps, slipBps);
+    var options = new BacktestOptions(cash);
+    List<IStrategy> toRun = [strategy];
+    if (strategy is not BuyAndHoldStrategy)
+    {
+        toRun.Add(new BuyAndHoldStrategy());
+    }
+
+    foreach (var s in toRun)
+    {
+        var result = await BacktestEngine.RunAsync(symbol, market, interval, candles, s, fees, options).ConfigureAwait(false);
+        var m = result.Metrics;
+        Console.WriteLine($"  {result.StrategyName,-16} return {m.TotalReturnPct:0.##}%  maxDD {m.MaxDrawdownPct:0.##}%  sharpe {m.Sharpe:0.##}  trades {m.Trades}  bars {m.Bars}");
+    }
+}
+
 static string? GetOpt(string[] args, string name)
 {
     for (var i = 0; i < args.Length - 1; i++)
@@ -118,6 +167,16 @@ static string? GetOpt(string[] args, string name)
     }
 
     return null;
+}
+
+static IStrategy ParseStrategy(string value, int fastPeriod, int slowPeriod)
+{
+    return value.ToUpperInvariant() switch
+    {
+        "SMA" => new SmaCrossoverStrategy(fastPeriod, slowPeriod),
+        "BUYHOLD" => new BuyAndHoldStrategy(),
+        _ => throw new ArgumentException($"Unsupported strategy '{value}' (use sma or buyhold).", nameof(value)),
+    };
 }
 
 static CandleInterval ParseInterval(string value)

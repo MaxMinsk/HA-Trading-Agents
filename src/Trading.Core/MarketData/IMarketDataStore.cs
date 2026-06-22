@@ -28,4 +28,22 @@ public interface IMarketDataStore
         DateTimeOffset asOfUtc,
         int limit,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns stored candles whose open time is within [<paramref name="fromUtc"/>, <paramref name="toUtc"/>],
+    /// ascending by close time. Used by the backtest harness to load a contiguous range.
+    /// </summary>
+    /// <param name="symbol">Exchange symbol.</param>
+    /// <param name="market">The market.</param>
+    /// <param name="interval">The candle interval.</param>
+    /// <param name="fromUtc">Range start (UTC), inclusive, by open time.</param>
+    /// <param name="toUtc">Range end (UTC), inclusive, by open time.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<Candle>> GetCandlesRangeAsync(
+        string symbol,
+        Market market,
+        CandleInterval interval,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default);
 }

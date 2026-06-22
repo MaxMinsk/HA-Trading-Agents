@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Deterministic backtest harness: strategies, execution costs, engine, metrics.
+       Depends on Trading.Core contracts only (storage-agnostic); settings from Directory.Build.props. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.Core\Trading.Core.csproj" />
+  </ItemGroup>
+
+</Project>

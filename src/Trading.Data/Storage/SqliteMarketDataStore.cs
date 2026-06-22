@@ -131,6 +131,45 @@ public sealed class SqliteMarketDataStore : IMarketDataStore
         return Task.FromResult<IReadOnlyList<Candle>>(results);
     }
 
+    /// <inheritdoc />
+    public Task<IReadOnlyList<Candle>> GetCandlesRangeAsync(
+        string symbol,
+        Market market,
+        CandleInterval interval,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(symbol);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var connection = _factory.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT symbol, market, interval, open_time_ms, close_time_ms, open, high, low, close, volume, source, ingested_at_ms
+            FROM candles
+            WHERE symbol = $symbol AND market = $market AND interval = $interval
+              AND open_time_ms >= $from AND open_time_ms <= $to
+            ORDER BY close_time_ms ASC;
+            """;
+        command.Parameters.Add("$symbol", SqliteType.Text).Value = symbol;
+        command.Parameters.Add("$market", SqliteType.Integer).Value = (int)market;
+        command.Parameters.Add("$interval", SqliteType.Integer).Value = (int)interval;
+        command.Parameters.Add("$from", SqliteType.Integer).Value = fromUtc.ToUnixTimeMilliseconds();
+        command.Parameters.Add("$to", SqliteType.Integer).Value = toUtc.ToUnixTimeMilliseconds();
+
+        var results = new List<Candle>();
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                results.Add(MapCandle(reader));
+            }
+        }
+
+        return Task.FromResult<IReadOnlyList<Candle>>(results);
+    }
+
     private static Candle MapCandle(SqliteDataReader reader) => new()
     {
         Symbol = reader.GetString(0),
