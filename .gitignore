@@ -1,0 +1,29 @@
+# Personal / working docs & vendored references — not part of the public repo
+Notes~/
+implementation_plan/
+references/
+References~/
+
+# .NET build output
+bin/
+obj/
+*.user
+
+# IDE
+.vs/
+.idea/
+*.DotSettings.user
+
+# Local data, databases & secrets — NEVER commit market dumps or API keys
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.duckdb
+*.parquet
+data/
+.env
+appsettings.Local.json
+secrets.json
+
+# OS noise
+.DS_Store

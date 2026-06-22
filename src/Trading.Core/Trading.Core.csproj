@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Storage- and vendor-agnostic domain contracts. Settings inherited from Directory.Build.props.
+       No external runtime dependencies on purpose: the exchange/storage implementations live in
+       Trading.Data and depend on this, not the other way around. -->
+
+</Project>

@@ -1,0 +1,32 @@
+<Project>
+
+  <!-- Common settings for every project in the repository. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Deterministic>true</Deterministic>
+
+    <!-- Single source of the build version. -->
+    <Version>0.1.0</Version>
+
+    <!-- Warnings stay visible locally; CI runs `dotnet build -warnaserror` to keep main zero-warning. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+
+    <!-- Code analysis (built-in CA quality + IDE style rules). Muted rules carry a rationale in .editorconfig. -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Suppress NU1903 for GHSA-2m69-gcr7-jv3q: it flags every released SQLitePCLRaw lib/bundle_e_sqlite3
+         (2.1.10 and the latest 2.1.11), pulled transitively by Microsoft.Data.Sqlite — no patched upstream
+         release exists yet. SQLite is a local embedded store here, not network-exposed. Tracked by TRD-008;
+         remove this suppression once SQLitePCLRaw ships a fixed version. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
+</Project>

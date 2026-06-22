@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Binance ingestion + canonical SQLite store + point-in-time snapshot builder.
+       Depends on Trading.Core (contracts); settings inherited from Directory.Build.props. -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.Core\Trading.Core.csproj" />
+  </ItemGroup>
+
+</Project>

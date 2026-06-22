@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Console host: backfill Binance candles into the SQLite store and print point-in-time snapshots.
+       This is the runnable entrypoint for TRD-001; analysis/style settings inherited from Directory.Build.props
+       (console-output rules relaxed for this folder in .editorconfig). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Trading.Cli</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.Core\Trading.Core.csproj" />
+    <ProjectReference Include="..\Trading.Data\Trading.Data.csproj" />
+  </ItemGroup>
+
+</Project>
