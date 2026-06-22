@@ -170,6 +170,38 @@ public sealed class SqliteMarketDataStore : IMarketDataStore
         return Task.FromResult<IReadOnlyList<Candle>>(results);
     }
 
+    /// <inheritdoc />
+    public Task<IReadOnlyList<SeriesSummary>> GetSeriesSummaryAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var connection = _factory.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT symbol, market, interval, COUNT(*) AS n, MIN(open_time_ms) AS first_open, MAX(close_time_ms) AS last_close
+            FROM candles
+            GROUP BY symbol, market, interval
+            ORDER BY symbol, market, interval;
+            """;
+
+        var results = new List<SeriesSummary>();
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                results.Add(new SeriesSummary(
+                    reader.GetString(0),
+                    (Market)reader.GetInt32(1),
+                    (CandleInterval)reader.GetInt32(2),
+                    reader.GetInt32(3),
+                    reader.IsDBNull(4) ? null : DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(4)),
+                    reader.IsDBNull(5) ? null : DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(5))));
+            }
+        }
+
+        return Task.FromResult<IReadOnlyList<SeriesSummary>>(results);
+    }
+
     private static Candle MapCandle(SqliteDataReader reader) => new()
     {
         Symbol = reader.GetString(0),

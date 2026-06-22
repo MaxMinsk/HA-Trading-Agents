@@ -46,4 +46,8 @@ public interface IMarketDataStore
         DateTimeOffset fromUtc,
         DateTimeOffset toUtc,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Summarises every stored candle series (count + time range), for status/availability reporting.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IReadOnlyList<SeriesSummary>> GetSeriesSummaryAsync(CancellationToken cancellationToken = default);
 }

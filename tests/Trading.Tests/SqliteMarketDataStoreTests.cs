@@ -110,6 +110,21 @@ public sealed class SqliteMarketDataStoreTests : IDisposable
         Assert.True(read[1].CloseTimeUtc < read[2].CloseTimeUtc);
     }
 
+    [Fact]
+    public async Task GetSeriesSummary_ReturnsPerSeriesCountAndRange()
+    {
+        var t0 = new DateTimeOffset(2026, 6, 22, 0, 0, 0, TimeSpan.Zero);
+        await _store.UpsertCandlesAsync([CandleClosingAt(t0.AddHours(-1)), CandleClosingAt(t0)]);
+
+        var summary = await _store.GetSeriesSummaryAsync();
+
+        var series = Assert.Single(summary);
+        Assert.Equal("BTCUSDT", series.Symbol);
+        Assert.Equal(CandleInterval.OneHour, series.Interval);
+        Assert.Equal(2, series.Count);
+        Assert.Equal(t0, series.LastCloseUtc);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

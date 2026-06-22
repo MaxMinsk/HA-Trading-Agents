@@ -1,0 +1,36 @@
+name: Trading Data MCP
+version: "0.1.0"
+slug: trading_mcp
+description: Binance market-data layer (ingestion + SQLite) exposed over MCP for trading agents.
+url: https://github.com/MaxMinsk/HA-Trading-Agents/tree/main/addon
+arch:
+  - amd64
+  - aarch64
+startup: services
+boot: auto
+init: false
+# Cold backup so the WAL-mode SQLite DB under /data is captured as a consistent snapshot.
+backup: cold
+image: ghcr.io/maxminsk/ha-trading-agents
+# Supervisor pings this unauthenticated liveness probe; a failure restarts the add-on.
+watchdog: "http://[HOST]:[PORT:8080]/health"
+ports:
+  "8080/tcp": 8080
+ports_description:
+  "8080/tcp": MCP endpoint (/mcp), bearer-protected
+options:
+  db_path: "/data/market.sqlite"
+  bearer_token: ""
+  symbols: "BTCUSDT,ETHUSDT"
+  interval: "1h"
+  backfill_days: 30
+  spot_klines_url: "https://data-api.binance.vision/api/v3/klines"
+  log_level: "Information"
+schema:
+  db_path: str
+  bearer_token: password?
+  symbols: str
+  interval: list(1h|4h|1d)
+  backfill_days: int
+  spot_klines_url: str?
+  log_level: list(Trace|Debug|Information|Warning|Error)
