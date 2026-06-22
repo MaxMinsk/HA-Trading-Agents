@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Trading.Core\Trading.Core.csproj" />
     <ProjectReference Include="..\Trading.Data\Trading.Data.csproj" />
+    <ProjectReference Include="..\Trading.Backtest\Trading.Backtest.csproj" />
   </ItemGroup>
 
 </Project>

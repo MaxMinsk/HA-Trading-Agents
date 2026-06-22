@@ -2,7 +2,7 @@
 
 A **data-first, low-frequency** crypto trading research system on **C#/.NET 9 + Microsoft Agent Framework (MAF)**. MAF orchestrates a team of typed agents (analysts → bull/bear debate → trader → risk reviewer); the edge and correctness come from the data, validation, risk, and execution layers underneath — which we build first.
 
-> **Status:** the data layer is in place — `Trading.Core` (domain contracts + the no-look-ahead snapshot invariant) and `Trading.Data` (SQLite store, Binance REST + live WebSocket ingestion, point-in-time snapshots, data-quality checks), driven by the `Trading.Cli` console host. 39 tests; `dotnet build -warnaserror` clean. The agent and risk layers are next. Backlog, sprints, and decisions live in the **Memory MCP** (`domain=development`, project `binance-maf-trader`), not in this repo.
+> **Status:** the data layer and a backtest harness are in place — `Trading.Core` (domain contracts + the no-look-ahead snapshot invariant), `Trading.Data` (SQLite store, Binance REST + live WebSocket ingestion, point-in-time snapshots, data-quality checks), and `Trading.Backtest` (strategies, engine, metrics, buy&hold benchmark), driven by the `Trading.Cli` console host. 53 tests; `dotnet build -warnaserror` clean. The agent and risk layers are next. Backlog, sprints, and decisions live in the **Memory MCP** (`domain=development`, project `binance-maf-trader`), not in this repo.
 
 ## Why this shape
 
@@ -16,11 +16,18 @@ A **data-first, low-frequency** crypto trading research system on **C#/.NET 9 + 
 ```
 src/Trading.Core    — storage/vendor-agnostic domain contracts (Candle, MarketSnapshot, TradeDecision, interfaces)
 src/Trading.Data    — Binance ingestion (REST + live WebSocket), SQLite store, snapshots, data-quality  (TRD-001, done)
-src/Trading.Cli     — console host: backfill history and stream live candles into the store             (TRD-001)
+src/Trading.Cli     — console host: backfill, stream, and backtest                                      (TRD-001 / TRD-S2)
+src/Trading.Backtest— strategies, backtest engine, performance metrics, buy&hold benchmark              (TRD-S2)
 src/Trading.Agents  — MAF multi-agent workflow                                       (TRD-004, planned)
 src/Trading.Risk    — deterministic risk + execution (testnet → live)               (TRD-003, planned)
 tests/Trading.Tests — unit & integration tests
 ```
+
+## Requirements
+
+- **.NET 9 SDK** (pinned via `global.json`).
+- **A Memory MCP server** — the project keeps its backlog, sprints, decisions, and the agent layer's durable memory/audit in [Memory MCP](https://github.com/MaxMinsk/HomeMemory) (`domain=development`, project `binance-maf-trader`), not in this repo. Agents connect to it over MCP to recall context and record decisions.
+- **Reachable model APIs for the agent layer** — the planned LLM/agent layer calls Anthropic/OpenAI, so it must run where those APIs are reachable (e.g. locally); it is not expected to run on a geo-restricted server. The data layer (backfill/stream) has no such requirement.
 
 ## Build & test
 
@@ -40,6 +47,9 @@ dotnet run --project src/Trading.Cli -- backfill --symbols BTCUSDT,ETHUSDT --int
 
 # stream live closed candles into the store (Ctrl+C to stop)
 dotnet run --project src/Trading.Cli -- stream --symbols BTCUSDT,ETHUSDT --interval 1h
+
+# backtest a strategy vs buy & hold over stored candles (net of fees/slippage)
+dotnet run --project src/Trading.Cli -- backtest --symbols BTCUSDT --interval 1h --strategy sma --fast 20 --slow 50 --days 120
 ```
 
 ## Backlog (in Memory MCP)
@@ -47,8 +57,8 @@ dotnet run --project src/Trading.Cli -- stream --symbols BTCUSDT,ETHUSDT --inter
 ```
 # active sprint board
 notes_search(domain="development", type="backlog_item",
-             filter="payload.project == 'binance-maf-trader' AND payload.sprint == 'TRD-S1'",
+             filter="payload.project == 'binance-maf-trader' AND payload.sprint == 'TRD-S2'",
              includePayload=true)
 ```
 
-Current sprint **TRD-S1 — Data-first foundation**: `TRD-006` repo scaffolding (done), `TRD-001` data layer (done), `TRD-002` baseline + backtest harness (next).
+Current sprint **TRD-S2 — Baseline + backtest harness**: fee/slippage model, SMA baseline + buy&hold benchmark, backtest engine, performance metrics, and a `backtest` CLI command. (TRD-S1 — data-first foundation — is done.)

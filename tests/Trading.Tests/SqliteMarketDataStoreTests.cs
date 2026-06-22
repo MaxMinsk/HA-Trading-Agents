@@ -89,6 +89,27 @@ public sealed class SqliteMarketDataStoreTests : IDisposable
         Assert.Single(snapshot.Candles);
     }
 
+    [Fact]
+    public async Task GetCandlesRange_ReturnsOnlyInRangeAscending()
+    {
+        var t0 = new DateTimeOffset(2026, 6, 22, 0, 0, 0, TimeSpan.Zero);
+        // Candles close at t0-2h..t0+1h; each opens 1h before its close.
+        await _store.UpsertCandlesAsync([
+            CandleClosingAt(t0.AddHours(-2)),
+            CandleClosingAt(t0.AddHours(-1)),
+            CandleClosingAt(t0),
+            CandleClosingAt(t0.AddHours(1)),
+        ]);
+
+        // Range by open time [t0-3h, t0-1h] selects the candles opening at t0-3h, t0-2h, t0-1h.
+        var read = await _store.GetCandlesRangeAsync(
+            "BTCUSDT", Market.Spot, CandleInterval.OneHour, t0.AddHours(-3), t0.AddHours(-1));
+
+        Assert.Equal(3, read.Count);
+        Assert.True(read[0].CloseTimeUtc < read[1].CloseTimeUtc);
+        Assert.True(read[1].CloseTimeUtc < read[2].CloseTimeUtc);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
