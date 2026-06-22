@@ -46,9 +46,19 @@ dotnet_diagnostic.CA1032.severity = none
 [tests/**/*.cs]
 dotnet_diagnostic.CA1707.severity = none
 
-# CLI console host: output is human-facing, not localized, and the app has no sync context.
+# Console hosts: output is human-facing, not localized, and the app has no sync context.
 [src/Trading.Cli/**.cs]
 dotnet_diagnostic.CA1303.severity = none
 dotnet_diagnostic.CA1305.severity = none
 dotnet_diagnostic.MA0011.severity = none
 dotnet_diagnostic.MA0004.severity = none
+
+[src/Trading.Agent/**.cs]
+dotnet_diagnostic.CA1303.severity = none
+dotnet_diagnostic.CA1305.severity = none
+dotnet_diagnostic.MA0011.severity = none
+dotnet_diagnostic.MA0004.severity = none
+
+# MCP server host: low-frequency ingestion/lifecycle logging — LoggerMessage source-gen is overkill here.
+[src/Trading.Mcp/**.cs]
+dotnet_diagnostic.CA1848.severity = none

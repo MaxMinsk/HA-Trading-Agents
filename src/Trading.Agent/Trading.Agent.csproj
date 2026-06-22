@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Relocatable agent host: an MCP CLIENT of the data layer. Runs locally (where model APIs are
+       reachable) or inside the add-on; reaches market data only over MCP. References Core contracts only. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Trading.Agent</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Trading.Core\Trading.Core.csproj" />
+  </ItemGroup>
+
+</Project>
