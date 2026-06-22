@@ -37,9 +37,14 @@ if (string.Equals(transport, "http", StringComparison.OrdinalIgnoreCase))
     var builder = WebApplication.CreateBuilder(args);
     RegisterServices(builder.Services, dbPath);
     AddIngestionIfEnabled(builder.Services, defaultEnabled: true);
-    builder.Services.AddMcpServer(options => options.ServerInstructions = ServerInstructions)
+    var execEnabled = ExecutionRegistration.AddExecutionIfEnabled(builder.Services);
+    var mcp = builder.Services.AddMcpServer(options => options.ServerInstructions = ServerInstructions)
         .WithHttpTransport(options => options.Stateless = true)
         .WithTools<MarketTools>(StructuredToolJson());
+    if (execEnabled)
+    {
+        mcp.WithTools<ExecutionTools>(StructuredToolJson());
+    }
 
     var app = builder.Build();
     Bootstrap(app.Services);
@@ -74,9 +79,14 @@ else
     builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
     RegisterServices(builder.Services, dbPath);
     AddIngestionIfEnabled(builder.Services, defaultEnabled: false);
-    builder.Services.AddMcpServer(options => options.ServerInstructions = ServerInstructions)
+    var execEnabled = ExecutionRegistration.AddExecutionIfEnabled(builder.Services);
+    var mcp = builder.Services.AddMcpServer(options => options.ServerInstructions = ServerInstructions)
         .WithStdioServerTransport()
         .WithTools<MarketTools>(StructuredToolJson());
+    if (execEnabled)
+    {
+        mcp.WithTools<ExecutionTools>(StructuredToolJson());
+    }
 
     var app = builder.Build();
     Bootstrap(app.Services);
