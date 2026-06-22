@@ -32,7 +32,7 @@ csharp_style_expression_bodied_methods = when_on_single_line:suggestion
 
 # Nullable / quality
 dotnet_style_qualification_for_field = false:warning
-dotnet_style_require_accessibility_modifiers = always:warning
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
 
 # Naming: interfaces start with I, types are PascalCase (defaults are fine; left explicit-light)
 
