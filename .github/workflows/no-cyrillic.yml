@@ -1,0 +1,28 @@
+name: no-cyrillic
+
+# Enforce the repository language policy: tracked code, comments and config must be English.
+# Markdown is not scanned — docs are local working files (only README.md is tracked).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  no-cyrillic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail on Cyrillic in code, comments and config
+        run: |
+          if git grep -nIP '\p{Cyrillic}' -- \
+              '*.cs' '*.csproj' '*.props' '*.targets' '*.sln' \
+              '*.json' '*.yml' '*.yaml' '.editorconfig' '*.editorconfig'; then
+            echo "::error::Cyrillic characters found in tracked code/comments/config — these must be English."
+            exit 1
+          fi
+          echo "OK: no Cyrillic in tracked code, comments or config."

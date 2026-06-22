@@ -27,3 +27,7 @@ secrets.json
 
 # OS noise
 .DS_Store
+
+# Markdown docs are local working files; only README.md is tracked in the repo.
+*.md
+!README.md
