@@ -13,6 +13,8 @@ WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY src/Trading.Core/Trading.Core.csproj ./src/Trading.Core/
 COPY src/Trading.Data/Trading.Data.csproj ./src/Trading.Data/
+COPY src/Trading.Risk/Trading.Risk.csproj ./src/Trading.Risk/
+COPY src/Trading.Execution/Trading.Execution.csproj ./src/Trading.Execution/
 COPY src/Trading.Mcp/Trading.Mcp.csproj ./src/Trading.Mcp/
 
 RUN \

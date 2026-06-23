@@ -1,6 +1,0 @@
-# Base images per architecture for the Home Assistant add-on builder.
-build_from:
-  amd64: ghcr.io/home-assistant/amd64-base:3.23
-  aarch64: ghcr.io/home-assistant/aarch64-base:3.23
-labels:
-  org.opencontainers.image.source: https://github.com/MaxMinsk/HA-Trading-Agents

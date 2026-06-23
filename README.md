@@ -27,7 +27,7 @@ src/Trading.Agent    — relocatable host: an MCP client that runs the crew (or 
 src/Trading.Cli      — console host: backfill, stream, backtest                                           (TRD-001 / TRD-S2)
 src/Trading.Api      — ASP.NET backend: serves the web UI + crew SSE stream and MCP proxies              (TRD-S6)
 src/Trading.Web      — React + TypeScript web UI (Vite / Tailwind / Zustand), mirrors PFlow              (TRD-S6)
-addon/               — HA add-on: data + execution MCP server (Dockerfile, config.yaml, run.sh, build.yaml)
+addon/               — HA add-on: data + execution MCP server (Dockerfile, config.yaml, run.sh)
 addon-agent/         — HA add-on: agent crew + web UI (MCP client of the data add-on)                     (TRD-S7)
 repository.yaml      — HA add-on repository manifest (lists both add-ons; Memory MCP is a separate repo)  (TRD-S7)
 scripts/run-local.sh — run the full stack locally (data+exec MCP + agent web app)                         (TRD-S7)
@@ -154,11 +154,12 @@ All keys are configured in the **add-on options** (or env locally) — never in 
 
 ## Release
 
+Same model as the Memory MCP add-on: a release is an add-on **version bump merged to `main`**.
+
 1. Bump `version` in `addon/config.yaml` and/or `addon-agent/config.yaml`.
-2. Commit, then tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-3. The `release` workflow builds the multi-arch images (HA builder) and pushes them to GHCR (`ghcr.io/maxminsk/ha-trading-agents-mcp-{arch}` and `…-agent-{arch}`).
-4. In HA Supervisor the add-on shows an update — apply it (Supervisor pulls the new image and restarts the add-on).
-5. Restart the local stack on the new version (re-run `scripts/run-local.sh`, or `git pull` + rebuild).
+2. Merge to `main`. The `addons` workflow builds the multi-arch images (HA builder actions) and publishes a manifest to GHCR — `ghcr.io/maxminsk/ha-trading-agents-mcp` and `…-agent`, tagged `:<version>` and `:latest`. (Pull requests build the images but do not push; `workflow_dispatch` rebuilds on demand.)
+3. In HA Supervisor the add-on shows an update — apply it (Supervisor pulls the new image and restarts the add-on).
+4. Restart the local stack on the new version (re-run `scripts/run-local.sh`, or `git pull` + rebuild).
 
 ## Smoke test via the UI
 

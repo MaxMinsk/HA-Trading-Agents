@@ -1,0 +1,39 @@
+name: addons
+
+# Build both Home Assistant add-ons. Like HAMemory, this runs on add-on/workflow changes (a release
+# is an add-on version bump in config.yaml), validates the Docker build on PRs (no push), and
+# publishes the multi-arch manifests to GHCR on push to main.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "addon/**"
+      - "addon-agent/**"
+      - ".github/workflows/addons.yaml"
+      - ".github/workflows/build-addon.yaml"
+  pull_request:
+    paths:
+      - "addon/**"
+      - "addon-agent/**"
+      - ".github/workflows/addons.yaml"
+      - ".github/workflows/build-addon.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+
+jobs:
+  data-mcp:
+    uses: ./.github/workflows/build-addon.yaml
+    with:
+      addon_path: ./addon
+      push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+  agent:
+    uses: ./.github/workflows/build-addon.yaml
+    with:
+      addon_path: ./addon-agent
+      push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
