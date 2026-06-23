@@ -36,7 +36,7 @@ public sealed class ApiIntegrationTests
     }
 
     [Fact]
-    public async Task Config_RespondsWithLlmConfiguredFlag()
+    public async Task Config_RespondsWithReadOnlyStatus()
     {
         using var factory = new WebApplicationFactory<Program>();
         using var client = factory.CreateClient();
@@ -44,6 +44,19 @@ public sealed class ApiIntegrationTests
         var json = await client.GetStringAsync("/api/config");
 
         Assert.Contains("llmConfigured", json, StringComparison.Ordinal);
+        Assert.Contains("mcpUrl", json, StringComparison.Ordinal);
+        Assert.Contains("mcpBearerSet", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Health_RespondsOk()
+    {
+        using var factory = new WebApplicationFactory<Program>();
+        using var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/health");
+
+        Assert.Equal("ok", body);
     }
 
     private sealed class FakeCrewRunner : ICrewRunner

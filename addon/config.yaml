@@ -11,7 +11,7 @@ boot: auto
 init: false
 # Cold backup so the WAL-mode SQLite DB under /data is captured as a consistent snapshot.
 backup: cold
-image: ghcr.io/maxminsk/ha-trading-agents
+image: ghcr.io/maxminsk/ha-trading-agents-mcp-{arch}
 # Supervisor pings this unauthenticated liveness probe; a failure restarts the add-on.
 watchdog: "http://[HOST]:[PORT:8080]/health"
 ports:

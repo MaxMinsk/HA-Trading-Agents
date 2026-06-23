@@ -14,4 +14,16 @@
     <ProjectReference Include="..\Trading.Agents\Trading.Agents.csproj" />
   </ItemGroup>
 
+  <!-- Build the React SPA into wwwroot so the API serves it. Opt-in (-p:BuildSpa=true) so the normal
+       dotnet CI build needs no Node toolchain; the Docker image and the local run script enable it. -->
+  <Target Name="BuildSpa" BeforeTargets="BeforeBuild" Condition="'$(BuildSpa)' == 'true'">
+    <Exec Command="npm ci" WorkingDirectory="$(MSBuildProjectDirectory)/../Trading.Web" />
+    <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)/../Trading.Web" />
+    <ItemGroup>
+      <_SpaDist Include="$(MSBuildProjectDirectory)/../Trading.Web/dist/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_SpaDist)"
+          DestinationFiles="@(_SpaDist->'$(MSBuildProjectDirectory)/wwwroot/%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+
 </Project>

@@ -31,15 +31,20 @@ app.UseStaticFiles();
 
 var api = app.MapGroup("/api");
 
-// Whether the crew can run here (an LLM key is configured) + the resolved provider/model.
+// Read-only config status so the UI can verify the server is set up. Keys are configured via HA
+// add-on options / env — never through the UI — so only their presence is reported, never the value.
 api.MapGet("/config", () =>
 {
     var llm = AgentEnvironment.TryReadLlmOptions();
+    var mcpUrl = Environment.GetEnvironmentVariable("TRADING_MCP_URL") ?? "http://localhost:8080/mcp";
+    var bearerSet = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TRADING_BEARER_TOKEN"));
     return Results.Json(new
     {
         llmConfigured = llm is not null,
         provider = llm?.Provider.ToString(),
         model = llm?.Model,
+        mcpUrl,
+        mcpBearerSet = bearerSet,
     });
 });
 
@@ -79,6 +84,7 @@ api.MapPost("/run", async (RunRequest req, HttpContext ctx, ICrewRunner runner, 
     }
 });
 
+app.MapGet("/health", () => Results.Text("ok"));
 app.MapFallbackToFile("index.html");
 
 await app.RunAsync();

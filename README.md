@@ -2,7 +2,7 @@
 
 A **data-first, low-frequency** crypto trading research system on **C#/.NET 9 + Microsoft Agent Framework (MAF)**. MAF orchestrates a team of typed agents (analysts → bull/bear debate → trader → risk reviewer); the edge and correctness come from the data, validation, risk, and execution layers underneath — which we build first.
 
-> **Status:** the data layer (with a backtest harness) is exposed over **MCP**, a **MAF multi-agent crew** consumes it, and a **deterministic risk + execution layer** is exposed as MCP write-tools (paper / Binance testnet). `Trading.Core` (contracts + the no-look-ahead snapshot invariant + execution contracts), `Trading.Data` (SQLite store, Binance REST + live WebSocket ingestion, snapshots, data-quality), `Trading.Backtest` (strategies + metrics + buy&hold), `Trading.Risk` (limits + the gate), `Trading.Execution` (execution service + paper & Binance-testnet adapters), `Trading.Agents` (the MAF crew — provider-abstracted over Anthropic + OpenAI), `Trading.Mcp` (the market-data + execution MCP server / HA add-on with in-process ingestion), `Trading.Agent` (a relocatable MCP-client host that runs the crew), `Trading.Api` (an ASP.NET backend), and `Trading.Web` (a React + TypeScript web UI). 110 .NET tests + 17 web tests; `dotnet build -warnaserror` and the web lint/build/test are clean. Backtesting the crew against the TRD-002 baselines is next. Backlog, sprints, and decisions live in the **Memory MCP** (`domain=development`, project `binance-maf-trader`), not in this repo.
+> **Status:** the data layer (with a backtest harness) is exposed over **MCP**, a **MAF multi-agent crew** consumes it, and a **deterministic risk + execution layer** is exposed as MCP write-tools (paper / Binance testnet). `Trading.Core` (contracts + the no-look-ahead snapshot invariant + execution contracts), `Trading.Data` (SQLite store, Binance REST + live WebSocket ingestion, snapshots, data-quality), `Trading.Backtest` (strategies + metrics + buy&hold), `Trading.Risk` (limits + the gate), `Trading.Execution` (execution service + paper & Binance-testnet adapters), `Trading.Agents` (the MAF crew — provider-abstracted over Anthropic + OpenAI), `Trading.Mcp` (the market-data + execution MCP server / HA add-on with in-process ingestion), `Trading.Agent` (a relocatable MCP-client host that runs the crew), `Trading.Api` (an ASP.NET backend), and `Trading.Web` (a React + TypeScript web UI). 111 .NET tests + 20 web tests; `dotnet build -warnaserror` and the web lint/build/test are clean. Both layers install as Home Assistant add-ons (data+execution, and agent/web); backtesting the crew against the TRD-002 baselines is next. Backlog, sprints, and decisions live in the **Memory MCP** (`domain=development`, project `binance-maf-trader`), not in this repo.
 
 ## Why this shape
 
@@ -27,7 +27,10 @@ src/Trading.Agent    — relocatable host: an MCP client that runs the crew (or 
 src/Trading.Cli      — console host: backfill, stream, backtest                                           (TRD-001 / TRD-S2)
 src/Trading.Api      — ASP.NET backend: serves the web UI + crew SSE stream and MCP proxies              (TRD-S6)
 src/Trading.Web      — React + TypeScript web UI (Vite / Tailwind / Zustand), mirrors PFlow              (TRD-S6)
-addon/               — Home Assistant add-on packaging for the MCP server (Dockerfile, config.yaml, run.sh)
+addon/               — HA add-on: data + execution MCP server (Dockerfile, config.yaml, run.sh, build.yaml)
+addon-agent/         — HA add-on: agent crew + web UI (MCP client of the data add-on)                     (TRD-S7)
+repository.yaml      — HA add-on repository manifest (lists both add-ons; Memory MCP is a separate repo)  (TRD-S7)
+scripts/run-local.sh — run the full stack locally (data+exec MCP + agent web app)                         (TRD-S7)
 tests/Trading.Tests  — unit & integration tests
 ```
 
@@ -127,15 +130,49 @@ TRADING_MCP_URL=http://127.0.0.1:8080/mcp TRADING_BEARER_TOKEN=dev \
 cd src/Trading.Web && npm install && npm run dev   # http://localhost:5175
 ```
 
-For production the backend serves the built SPA: `npm run build` and copy `src/Trading.Web/dist`
-into `src/Trading.Api/wwwroot`. Frontend checks: `npm run lint`, `npm run build`, `npm test`.
+For production the API serves the built SPA from `wwwroot`: `dotnet build src/Trading.Api -p:BuildSpa=true`
+builds the SPA and copies it in (the **Run the full stack locally** section does this for you). Frontend
+checks: `npm run lint`, `npm run build`, `npm test`.
+
+## Run the full stack locally
+
+```bash
+cp .env.example .env     # set TRADING_BEARER_TOKEN, TRADING_LLM_PROVIDER, ANTHROPIC_API_KEY / OPENAI_API_KEY
+./scripts/run-local.sh   # starts the data+exec MCP, builds the SPA into wwwroot, runs the API
+# open http://127.0.0.1:5080
+```
+
+## Install in Home Assistant
+
+This repository is a Home Assistant **add-on repository** with two add-ons (the Memory MCP is a separate repo).
+
+1. HA → Settings → Add-ons → Add-on Store → ⋮ → **Repositories** → add `https://github.com/MaxMinsk/HA-Trading-Agents`.
+2. Install **Trading Data MCP** (data + execution). In its options set `bearer_token`; for execution set `exec_enabled` + the Binance keys (default is paper). Start it.
+3. Optionally install **Trading Agent** (crew + web UI) on an HA instance that can reach the model APIs. Set `mcp_url` (the data add-on), `bearer_token` (same), `llm_provider`, `llm_api_key`. Start it and open the Web UI.
+
+All keys are configured in the **add-on options** (or env locally) — never in the web UI.
+
+## Release
+
+1. Bump `version` in `addon/config.yaml` and/or `addon-agent/config.yaml`.
+2. Commit, then tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+3. The `release` workflow builds the multi-arch images (HA builder) and pushes them to GHCR (`ghcr.io/maxminsk/ha-trading-agents-mcp-{arch}` and `…-agent-{arch}`).
+4. In HA Supervisor the add-on shows an update — apply it (Supervisor pulls the new image and restarts the add-on).
+5. Restart the local stack on the new version (re-run `scripts/run-local.sh`, or `git pull` + rebuild).
+
+## Smoke test via the UI
+
+1. Open the Web UI — the **Status** panel shows the resolved provider/model and the data-MCP URL/bearer.
+2. Pick a symbol/interval and **Run crew** — watch the analyst/bull/bear/trader/risk debate stream in, ending with a decision.
+3. Check **Balances** (the paper adapter shows the starting quote when execution is enabled).
+4. For a buy/sell decision, **Submit to execution** (confirm) — the paper adapter fills it and the outcome shows the risk verdict.
 
 ## Backlog (in Memory MCP)
 
 ```
 # active sprint board
 notes_search(domain="development", type="backlog_item",
-             filter="payload.project == 'binance-maf-trader' AND payload.sprint == 'TRD-S6'",
+             filter="payload.project == 'binance-maf-trader' AND payload.sprint == 'TRD-S7'",
              includePayload=true)
 ```
 
