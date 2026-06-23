@@ -10,7 +10,7 @@ startup: services
 # Optional companion to the data add-on; start it manually after configuring keys.
 boot: manual
 init: false
-image: ghcr.io/maxminsk/ha-trading-agents-agent-{arch}
+image: ghcr.io/maxminsk/ha-trading-agents-agent
 # Supervisor pings this unauthenticated liveness probe; a failure restarts the add-on.
 watchdog: "http://[HOST]:[PORT:8080]/health"
 ports:
