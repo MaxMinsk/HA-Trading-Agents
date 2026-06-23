@@ -5,6 +5,8 @@ export interface ApiConfig {
   llmConfigured: boolean;
   provider: string | null;
   model: string | null;
+  mcpUrl: string;
+  mcpBearerSet: boolean;
 }
 
 export interface CrewMessage {

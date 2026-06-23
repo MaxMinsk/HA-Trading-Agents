@@ -1,0 +1,33 @@
+name: Trading Agent
+version: "0.1.0"
+slug: trading_agent
+description: MAF multi-agent trading crew + web UI; an MCP client of the Trading Data MCP add-on.
+url: https://github.com/MaxMinsk/HA-Trading-Agents/tree/main/addon-agent
+arch:
+  - amd64
+  - aarch64
+startup: services
+# Optional companion to the data add-on; start it manually after configuring keys.
+boot: manual
+init: false
+image: ghcr.io/maxminsk/ha-trading-agents-agent-{arch}
+# Supervisor pings this unauthenticated liveness probe; a failure restarts the add-on.
+watchdog: "http://[HOST]:[PORT:8080]/health"
+ports:
+  "8080/tcp": 8099
+ports_description:
+  "8080/tcp": Web UI + API
+options:
+  mcp_url: "http://localhost:8080/mcp"
+  bearer_token: ""
+  llm_provider: "anthropic"
+  llm_model: ""
+  llm_api_key: ""
+  log_level: "Information"
+schema:
+  mcp_url: str
+  bearer_token: password?
+  llm_provider: list(anthropic|openai)
+  llm_model: str?
+  llm_api_key: password?
+  log_level: list(Trace|Debug|Information|Warning|Error)
