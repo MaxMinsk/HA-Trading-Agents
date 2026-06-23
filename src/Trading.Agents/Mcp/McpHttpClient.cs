@@ -1,23 +1,41 @@
 using System.Text;
 using System.Text.Json;
 
-namespace Trading.Agent;
+namespace Trading.Agents.Mcp;
 
 /// <summary>
 /// Minimal JSON-RPC MCP client over streamable HTTP: calls a tool and returns its structured result.
-/// A thin stand-in for the agent's MCP integration until the MAF workflow (TRD-004) takes over.
+/// Shared by the CLI host and the web backend so both reach the data/execution MCP the same way.
 /// </summary>
-internal sealed class McpHttpClient(HttpClient http, string url)
+public sealed class McpHttpClient
 {
-    private readonly HttpClient _http = http;
-    private readonly Uri _endpoint = new(url);
+    private readonly HttpClient _http;
+    private readonly Uri _endpoint;
     private int _id;
 
+    /// <summary>Creates the client over an HTTP client and the MCP endpoint (e.g. http://host:8080/mcp).</summary>
+    /// <param name="http">HTTP client (set its Authorization header for a bearer-protected endpoint).</param>
+    /// <param name="endpoint">The /mcp endpoint URI.</param>
+    public McpHttpClient(HttpClient http, Uri endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(endpoint);
+        _http = http;
+        _endpoint = endpoint;
+    }
+
+    /// <summary>Calls an MCP tool and returns its structured content (or the raw result if none).</summary>
+    /// <param name="name">Tool name.</param>
+    /// <param name="arguments">Tool arguments.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<JsonElement> CallToolAsync(
         string name,
         IReadOnlyDictionary<string, object?> arguments,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(arguments);
+
         var rpc = new
         {
             jsonrpc = "2.0",

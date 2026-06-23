@@ -21,7 +21,8 @@ jobs:
         run: |
           if git grep -nIP '\p{Cyrillic}' -- \
               '*.cs' '*.csproj' '*.props' '*.targets' '*.sln' \
-              '*.json' '*.yml' '*.yaml' '.editorconfig' '*.editorconfig'; then
+              '*.json' '*.yml' '*.yaml' '.editorconfig' '*.editorconfig' \
+              '*.ts' '*.tsx' '*.css' '*.html'; then
             echo "::error::Cyrillic characters found in tracked code/comments/config — these must be English."
             exit 1
           fi

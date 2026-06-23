@@ -31,7 +31,17 @@ public sealed class TradingCrew : IStrategy
     public string Name => "maf-crew";
 
     /// <inheritdoc />
-    public async Task<TradeDecision> DecideAsync(MarketSnapshot snapshot, CancellationToken cancellationToken = default)
+    public Task<TradeDecision> DecideAsync(MarketSnapshot snapshot, CancellationToken cancellationToken = default) =>
+        DecideAsync(snapshot, onMessage: null, cancellationToken);
+
+    /// <summary>Runs the crew, reporting each role's output as it completes (for a live debate view).</summary>
+    /// <param name="snapshot">Point-in-time snapshot.</param>
+    /// <param name="onMessage">Optional callback invoked with each role's message, awaited in order.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task<TradeDecision> DecideAsync(
+        MarketSnapshot snapshot,
+        Func<CrewMessage, CancellationToken, Task>? onMessage,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
@@ -39,12 +49,15 @@ public sealed class TradingCrew : IStrategy
 
         var analysis = await _agents.Create("analyst", AgentRoles.Analyst)
             .RunAsync(briefText, cancellationToken).ConfigureAwait(false);
+        await EmitAsync(onMessage, "analyst", analysis, cancellationToken).ConfigureAwait(false);
 
         var debateContext = briefText + "\n\n## Analyst notes\n" + analysis;
         var bullCase = await _agents.Create("bull", AgentRoles.Bull)
             .RunAsync(debateContext, cancellationToken).ConfigureAwait(false);
+        await EmitAsync(onMessage, "bull", bullCase, cancellationToken).ConfigureAwait(false);
         var bearCase = await _agents.Create("bear", AgentRoles.Bear)
             .RunAsync(debateContext, cancellationToken).ConfigureAwait(false);
+        await EmitAsync(onMessage, "bear", bearCase, cancellationToken).ConfigureAwait(false);
 
         var traderInput = debateContext
             + "\n\n## Bull case\n" + bullCase
@@ -52,6 +65,7 @@ public sealed class TradingCrew : IStrategy
             + "\n\nDecide now. Respond with ONLY the JSON object.";
         var traderOutput = await _agents.Create("trader", AgentRoles.Trader)
             .RunAsync(traderInput, cancellationToken).ConfigureAwait(false);
+        await EmitAsync(onMessage, "trader", traderOutput, cancellationToken).ConfigureAwait(false);
 
         var decision = TraderDecisionParser.Parse(traderOutput);
         if (!_options.UseRiskReviewer || decision.Action == TradeAction.Hold)
@@ -64,9 +78,22 @@ public sealed class TradingCrew : IStrategy
             $"Proposed decision: {decision.Action} sizeFraction {decision.SizeFraction} confidence {decision.Confidence}. Rationale: {decision.Rationale}");
         var verdict = await _agents.Create("risk-reviewer", AgentRoles.RiskReviewer)
             .RunAsync(briefText + "\n\n" + summary, cancellationToken).ConfigureAwait(false);
+        await EmitAsync(onMessage, "risk-reviewer", verdict, cancellationToken).ConfigureAwait(false);
 
         return verdict.Contains("BLOCK", StringComparison.OrdinalIgnoreCase)
             ? TradeDecision.Create(TradeAction.Hold, 0m, decision.Confidence, "risk reviewer blocked the trade")
             : decision;
+    }
+
+    private static async Task EmitAsync(
+        Func<CrewMessage, CancellationToken, Task>? onMessage,
+        string role,
+        string content,
+        CancellationToken cancellationToken)
+    {
+        if (onMessage is not null)
+        {
+            await onMessage(new CrewMessage(role, content), cancellationToken).ConfigureAwait(false);
+        }
     }
 }

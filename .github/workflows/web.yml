@@ -1,0 +1,44 @@
+name: web
+
+# Lint, type-check/build and test the React web UI (Trading.Web). Kept separate from the .NET build
+# so the dotnet CI needs no Node toolchain.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/Trading.Web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/Trading.Web/package-lock.json
+
+      # Node 22 bundles npm 10.x, which intermittently crashes on `npm ci` with
+      # "Exit handler never called!"; npm 11 (used to author the lockfile) is stable.
+      - name: Pin npm
+        run: npm install -g npm@11
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build (type-check + bundle)
+        run: npm run build
+
+      - name: Test
+        run: npm test

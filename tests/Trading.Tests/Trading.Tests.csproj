@@ -11,6 +11,7 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,6 +21,7 @@
     <ProjectReference Include="..\..\src\Trading.Risk\Trading.Risk.csproj" />
     <ProjectReference Include="..\..\src\Trading.Execution\Trading.Execution.csproj" />
     <ProjectReference Include="..\..\src\Trading.Agents\Trading.Agents.csproj" />
+    <ProjectReference Include="..\..\src\Trading.Api\Trading.Api.csproj" />
   </ItemGroup>
 
 </Project>
