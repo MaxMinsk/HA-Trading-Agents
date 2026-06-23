@@ -2,12 +2,13 @@
 
 A **data-first, low-frequency** crypto trading research system on **C#/.NET 9 + Microsoft Agent Framework (MAF)**. MAF orchestrates a team of typed agents (analysts → bull/bear debate → trader → risk reviewer); the edge and correctness come from the data, validation, risk, and execution layers underneath — which we build first.
 
-> **Status:** the data layer (with a backtest harness) is exposed over **MCP**, an agent host consumes it, and a **deterministic risk + execution layer** is exposed as MCP write-tools (paper / Binance testnet). `Trading.Core` (contracts + the no-look-ahead snapshot invariant + execution contracts), `Trading.Data` (SQLite store, Binance REST + live WebSocket ingestion, snapshots, data-quality), `Trading.Backtest` (strategies + metrics + buy&hold), `Trading.Risk` (limits + the gate), `Trading.Execution` (execution service + paper & Binance-testnet adapters), `Trading.Mcp` (the market-data + execution MCP server / HA add-on with in-process ingestion), and `Trading.Agent` (a relocatable MCP client). 87 tests; `dotnet build -warnaserror` clean. The MAF multi-agent workflow is next. Backlog, sprints, and decisions live in the **Memory MCP** (`domain=development`, project `binance-maf-trader`), not in this repo.
+> **Status:** the data layer (with a backtest harness) is exposed over **MCP**, a **MAF multi-agent crew** consumes it, and a **deterministic risk + execution layer** is exposed as MCP write-tools (paper / Binance testnet). `Trading.Core` (contracts + the no-look-ahead snapshot invariant + execution contracts), `Trading.Data` (SQLite store, Binance REST + live WebSocket ingestion, snapshots, data-quality), `Trading.Backtest` (strategies + metrics + buy&hold), `Trading.Risk` (limits + the gate), `Trading.Execution` (execution service + paper & Binance-testnet adapters), `Trading.Agents` (the MAF crew — provider-abstracted over Anthropic + OpenAI), `Trading.Mcp` (the market-data + execution MCP server / HA add-on with in-process ingestion), and `Trading.Agent` (a relocatable MCP-client host that runs the crew). 105 tests; `dotnet build -warnaserror` clean. A local Avalonia UI for the agent layer is next. Backlog, sprints, and decisions live in the **Memory MCP** (`domain=development`, project `binance-maf-trader`), not in this repo.
 
 ## Why this shape
 
 - **No look-ahead, ever** — a point-in-time `MarketSnapshot` may only contain data known at or before its decision time; enforced in code and tested.
-- **Baselines before multi-agent** — a rules/single-agent baseline with fees & slippage must be beaten out-of-sample before the multi-agent workflow earns its cost.
+- **Baselines before multi-agent** — a rules/single-agent baseline with fees & slippage must be beaten out-of-sample before the multi-agent workflow earns its cost. The crew is an `IStrategy`, so it backtests against the same baselines.
+- **Provider-abstracted agents** — the crew runs on one `IChatClient` seam (Microsoft.Extensions.AI); Anthropic and OpenAI are interchangeable by config, and MAF/SDK calls are confined to small adapters. The trader's output is parsed fail-closed to Hold.
 - **Deterministic risk owns the trigger** — the LLM proposes; plain code validates, sizes, gates (stop / daily-loss / kill-switch), and can veto. No live order path without it.
 - **Low-frequency** — 1h/4h/daily decisions; LLM cycles are too slow/expensive for scalping.
 - **Data over MCP** — the data layer runs as a Home Assistant add-on exposing market data via MCP; the agent is a relocatable MCP client (runs locally where Anthropic/OpenAI APIs are reachable, or inside the add-on). Order execution is MCP write-tools on the server too, behind the risk gate (paper by default, Binance testnet next, live opt-in) — keys never leave the server.
@@ -20,8 +21,9 @@ src/Trading.Data     — Binance ingestion (REST + live WebSocket), SQLite store
 src/Trading.Backtest — strategies, backtest engine, performance metrics, buy&hold benchmark              (TRD-S2)
 src/Trading.Risk     — deterministic risk limits + gate (size clamp, daily-loss stop, kill-switch)        (TRD-S4)
 src/Trading.Execution— execution service + paper adapter + Binance testnet adapter (HMAC-signed REST)      (TRD-S4)
+src/Trading.Agents   — MAF multi-agent crew (analyst/bull/bear/trader/risk), provider-abstracted          (TRD-S5)
 src/Trading.Mcp      — market-data + execution MCP server (HTTP+bearer / stdio) + in-process ingestion     (TRD-S3 / TRD-S4)
-src/Trading.Agent    — relocatable agent host: an MCP client of the data layer (MAF workflow lands in TRD-004)
+src/Trading.Agent    — relocatable host: an MCP client that runs the crew (or an SMA fallback) on a snapshot (TRD-S5)
 src/Trading.Cli      — console host: backfill, stream, backtest                                           (TRD-001 / TRD-S2)
 addon/               — Home Assistant add-on packaging for the MCP server (Dockerfile, config.yaml, run.sh)
 tests/Trading.Tests  — unit & integration tests
@@ -63,9 +65,25 @@ dotnet run --project src/Trading.Cli -- backtest --symbols BTCUSDT --interval 1h
 TRADING_TRANSPORT=http TRADING_BEARER_TOKEN=dev TRADING_INGEST=false \
   ASPNETCORE_URLS=http://127.0.0.1:8080 dotnet run --project src/Trading.Mcp
 
-# agent host: an MCP client of the data layer (same code locally or in the add-on — config only)
+# agent host (SMA fallback — no LLM key needed; same code locally or in the add-on)
 TRADING_MCP_URL=http://127.0.0.1:8080/mcp TRADING_BEARER_TOKEN=dev \
+  dotnet run --project src/Trading.Agent -- --symbol BTCUSDT --interval 1h --strategy sma
+```
+
+## Run the MAF multi-agent crew
+
+The crew (analyst → bull/bear debate → trader → risk reviewer) is provider-abstracted: set a provider,
+model, and key. It runs **locally**, where the model APIs are reachable. With no key configured the host
+falls back to the SMA strategy, so the loop still works on the geo-restricted server.
+
+```bash
+# Anthropic (Claude)
+TRADING_MCP_URL=http://127.0.0.1:8080/mcp TRADING_BEARER_TOKEN=dev \
+  TRADING_LLM_PROVIDER=anthropic TRADING_LLM_MODEL=claude-sonnet-4-6 ANTHROPIC_API_KEY=sk-ant-... \
   dotnet run --project src/Trading.Agent -- --symbol BTCUSDT --interval 1h
+
+# OpenAI (set TRADING_LLM_PROVIDER=openai, TRADING_LLM_MODEL, OPENAI_API_KEY)
+# Optional: TRADING_AGENT_SUBMIT=true forwards a non-hold decision to the execution MCP (exec_submit_intent).
 ```
 
 ## Enable execution (paper / Binance testnet)
@@ -95,8 +113,8 @@ Risk limits are configurable: `TRADING_MAX_POSITION_FRACTION` (0.25), `TRADING_M
 ```
 # active sprint board
 notes_search(domain="development", type="backlog_item",
-             filter="payload.project == 'binance-maf-trader' AND payload.sprint == 'TRD-S4'",
+             filter="payload.project == 'binance-maf-trader' AND payload.sprint == 'TRD-S5'",
              includePayload=true)
 ```
 
-Current sprint **TRD-S4 — Risk + execution (MCP write-tools, testnet/paper-first)**: deterministic risk limits + gate, exchange filters, execution service with a paper adapter and a Binance-testnet signed adapter, all exposed as MCP write-tools behind the gate. (TRD-S1 data-first, TRD-S2 baseline+backtest, and TRD-S3 market-data MCP add-on are done.)
+Current sprint **TRD-S5 — MAF multi-agent crew (provider-abstracted)**: the analyst/bull/bear/trader/risk-reviewer crew over one `IChatClient` seam (Anthropic + OpenAI), implementing `IStrategy`, wired into the agent host; unit-tested with a fake agent factory. (TRD-S1 data-first, TRD-S2 baseline+backtest, TRD-S3 market-data MCP add-on, and TRD-S4 risk+execution are done. Next: TRD-S6 — a local Avalonia UI for the agent layer.)
