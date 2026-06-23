@@ -26,6 +26,11 @@ jobs:
           cache: npm
           cache-dependency-path: src/Trading.Web/package-lock.json
 
+      # Node 22 bundles npm 10.x, which intermittently crashes on `npm ci` with
+      # "Exit handler never called!"; npm 11 (used to author the lockfile) is stable.
+      - name: Pin npm
+        run: npm install -g npm@11
+
       - name: Install
         run: npm ci
 
