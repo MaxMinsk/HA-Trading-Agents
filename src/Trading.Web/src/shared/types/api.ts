@@ -9,6 +9,28 @@ export interface ApiConfig {
   mcpBearerSet: boolean;
 }
 
+export interface SecretStatus {
+  set: boolean;
+  hint: string | null;
+}
+
+export interface SettingsDto {
+  mcpUrl: string | null;
+  mcpBearer: SecretStatus;
+  llmProvider: string | null;
+  llmModel: string | null;
+  llmApiKey: SecretStatus;
+  llmConfigured: boolean;
+}
+
+export interface SettingsUpdate {
+  mcpUrl?: string;
+  mcpBearer?: string;
+  llmProvider?: string;
+  llmModel?: string;
+  llmApiKey?: string;
+}
+
 export interface CrewMessage {
   role: string;
   content: string;

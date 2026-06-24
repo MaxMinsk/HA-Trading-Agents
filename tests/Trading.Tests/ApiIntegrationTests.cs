@@ -59,6 +59,30 @@ public sealed class ApiIntegrationTests
         Assert.Equal("ok", body);
     }
 
+    [Fact]
+    public async Task Settings_RoundTripMasksSecrets()
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), $"trd-settings-{Guid.NewGuid():N}.json");
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<SettingsStore>();
+                services.AddSingleton(new SettingsStore(tmp));
+            }));
+        using var client = factory.CreateClient();
+
+        var post = await client.PostAsJsonAsync(
+            "/api/settings",
+            new { llmProvider = "anthropic", llmModel = "claude-x", llmApiKey = "sk-secret123" });
+        post.EnsureSuccessStatusCode();
+        var json = await client.GetStringAsync("/api/settings");
+
+        Assert.Contains("\"set\":true", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("sk-secret123", json, StringComparison.Ordinal);
+
+        File.Delete(tmp);
+    }
+
     private sealed class FakeCrewRunner : ICrewRunner
     {
         public async Task<TradeDecision> RunAsync(

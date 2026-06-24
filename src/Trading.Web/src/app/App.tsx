@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { StatusPanel } from "@/shared/components/StatusPanel";
+import { SettingsPanel } from "@/shared/components/SettingsPanel";
 import { RunConfigForm } from "@/features/run/components/RunConfigForm";
 import { DebateTranscript } from "@/features/run/components/DebateTranscript";
 import { DecisionPanel } from "@/features/run/components/DecisionPanel";
@@ -25,8 +25,8 @@ export function App() {
       </header>
       <main className="mx-auto grid max-w-6xl gap-6 p-6 lg:grid-cols-2">
         <section className="flex flex-col gap-6">
-          <Card title="Status">
-            <StatusPanel />
+          <Card title="Settings">
+            <SettingsPanel />
           </Card>
           <Card>
             <RunConfigForm />

@@ -2,7 +2,7 @@
 
 A **data-first, low-frequency** crypto trading research system on **C#/.NET 9 + Microsoft Agent Framework (MAF)**. MAF orchestrates a team of typed agents (analysts → bull/bear debate → trader → risk reviewer); the edge and correctness come from the data, validation, risk, and execution layers underneath — which we build first.
 
-> **Status:** the data layer (with a backtest harness) is exposed over **MCP**, a **MAF multi-agent crew** consumes it, and a **deterministic risk + execution layer** is exposed as MCP write-tools (paper / Binance testnet). `Trading.Core` (contracts + the no-look-ahead snapshot invariant + execution contracts), `Trading.Data` (SQLite store, Binance REST + live WebSocket ingestion, snapshots, data-quality), `Trading.Backtest` (strategies + metrics + buy&hold), `Trading.Risk` (limits + the gate), `Trading.Execution` (execution service + paper & Binance-testnet adapters), `Trading.Agents` (the MAF crew — provider-abstracted over Anthropic + OpenAI), `Trading.Mcp` (the market-data + execution MCP server / HA add-on with in-process ingestion), `Trading.Agent` (a relocatable MCP-client host that runs the crew), `Trading.Api` (an ASP.NET backend), and `Trading.Web` (a React + TypeScript web UI). 111 .NET tests + 20 web tests; `dotnet build -warnaserror` and the web lint/build/test are clean. Both layers install as Home Assistant add-ons (data+execution, and agent/web); backtesting the crew against the TRD-002 baselines is next. Backlog, sprints, and decisions live in the **Memory MCP** (`domain=development`, project `binance-maf-trader`), not in this repo.
+> **Status:** the data layer (with a backtest harness) is exposed over **MCP**, a **MAF multi-agent crew** consumes it, and a **deterministic risk + execution layer** is exposed as MCP write-tools (paper / Binance testnet). `Trading.Core` (contracts + the no-look-ahead snapshot invariant + execution contracts), `Trading.Data` (SQLite store, Binance REST + live WebSocket ingestion, snapshots, data-quality), `Trading.Backtest` (strategies + metrics + buy&hold), `Trading.Risk` (limits + the gate), `Trading.Execution` (execution service + paper & Binance-testnet adapters), `Trading.Agents` (the MAF crew — provider-abstracted over Anthropic + OpenAI), `Trading.Mcp` (the market-data + execution MCP server / HA add-on with in-process ingestion), `Trading.Agent` (a relocatable MCP-client host that runs the crew), `Trading.Api` (an ASP.NET backend), and `Trading.Web` (a React + TypeScript web UI). 116 .NET tests + 20 web tests; `dotnet build -warnaserror` and the web lint/build/test are clean. Both layers install as Home Assistant add-ons (data+execution, and agent/web) and the agent is configurable from the web UI; backtesting the crew against the TRD-002 baselines is next. Backlog, sprints, and decisions live in the **Memory MCP** (`domain=development`, project `binance-maf-trader`), not in this repo.
 
 ## Why this shape
 
@@ -116,8 +116,10 @@ Risk limits are configurable: `TRADING_MAX_POSITION_FRACTION` (0.25), `TRADING_M
 ## Web UI
 
 A React + TypeScript app (`src/Trading.Web`, Vite/Tailwind/Zustand) served by the ASP.NET backend
-(`src/Trading.Api`). The backend is an MCP client of the data/execution MCP and hosts the crew;
-**LLM keys stay server-side** (the UI only selects provider/model). The crew debate streams to the
+(`src/Trading.Api`). The backend is an MCP client of the data/execution MCP and hosts the crew.
+Configure the provider/model, the data-MCP URL/bearer and the LLM key on the **Settings** panel —
+secrets are stored **server-side** (`data/settings.json`, masked in the UI), or set them via the
+add-on options / env. Precedence: **UI settings → env → default**. The crew debate streams to the
 browser over SSE, and execution submits are guarded by a confirmation.
 
 ```bash
@@ -150,7 +152,7 @@ This repository is a Home Assistant **add-on repository** with two add-ons (the 
 2. Install **Trading Data MCP** (data + execution). In its options set `bearer_token`; for execution set `exec_enabled` + the Binance keys (default is paper). Start it.
 3. Optionally install **Trading Agent** (crew + web UI) on an HA instance that can reach the model APIs. Set `mcp_url` (the data add-on), `bearer_token` (same), `llm_provider`, `llm_api_key`. Start it and open the Web UI.
 
-All keys are configured in the **add-on options** (or env locally) — never in the web UI.
+Keys can be set in the **add-on options** (or env), or on the web UI **Settings** panel (stored server-side, masked).
 
 ## Release
 
@@ -163,7 +165,7 @@ Same model as the Memory MCP add-on: a release is an add-on **version bump merge
 
 ## Smoke test via the UI
 
-1. Open the Web UI — the **Status** panel shows the resolved provider/model and the data-MCP URL/bearer.
+1. Open the Web UI — on the **Settings** panel set the provider/model + LLM key and the data-MCP URL/bearer (or rely on env/add-on options), and confirm "crew ready".
 2. Pick a symbol/interval and **Run crew** — watch the analyst/bull/bear/trader/risk debate stream in, ending with a decision.
 3. Check **Balances** (the paper adapter shows the starting quote when execution is enabled).
 4. For a buy/sell decision, **Submit to execution** (confirm) — the paper adapter fills it and the outcome shows the risk verdict.

@@ -6,6 +6,8 @@ import type {
   ExecuteRequest,
   ExecutionOutcome,
   RunRequest,
+  SettingsDto,
+  SettingsUpdate,
 } from "@/shared/types/api";
 import { parseSseEvent, splitSseChunks } from "@/shared/lib/sse";
 
@@ -28,6 +30,8 @@ export interface RunHandlers {
 
 export interface TradingApiClient {
   getConfig(): Promise<ApiConfig>;
+  getSettings(): Promise<SettingsDto>;
+  saveSettings(update: SettingsUpdate): Promise<SettingsDto>;
   getStatus(): Promise<unknown>;
   getBalances(): Promise<AccountSnapshot>;
   execute(request: ExecuteRequest): Promise<ExecutionOutcome>;
@@ -56,6 +60,13 @@ export function createTradingApiClient(options: CreateClientOptions = {}): Tradi
 
   return {
     getConfig: () => request<ApiConfig>("/api/config"),
+    getSettings: () => request<SettingsDto>("/api/settings"),
+    saveSettings: (update) =>
+      request<SettingsDto>("/api/settings", {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify(update),
+      }),
     getStatus: () => request<unknown>("/api/status"),
     getBalances: () => request<AccountSnapshot>("/api/balances"),
     execute: (req) =>
