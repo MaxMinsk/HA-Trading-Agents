@@ -1,27 +1,15 @@
-using System.Net.Http.Headers;
 using System.Text.Json;
-using Trading.Agents;
-using Trading.Agents.Mcp;
 using Trading.Api;
 
-// Web backend for the agent-layer UI. Serves the SPA and exposes a small API: market status/balances
-// proxies (over MCP), an SSE crew-run stream, and a guarded execute. LLM keys + the MCP bearer are
-// read from the server environment only.
+// Web backend for the agent-layer UI. Serves the SPA and a small API: read/write settings, market
+// status/balances proxies (over MCP), an SSE crew-run stream, and a guarded execute. Settings (incl.
+// keys) are stored server-side and resolved as: UI settings -> env / HA add-on options -> default.
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSingleton(_ =>
-{
-    var url = Environment.GetEnvironmentVariable("TRADING_MCP_URL") ?? "http://localhost:8080/mcp";
-    var bearer = Environment.GetEnvironmentVariable("TRADING_BEARER_TOKEN");
-    var http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
-    if (!string.IsNullOrWhiteSpace(bearer))
-    {
-        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
-    }
-
-    return new DataMcpClient(http, new Uri(url));
-});
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton(_ => new SettingsStore());
+builder.Services.AddSingleton<McpClientProvider>();
 builder.Services.AddSingleton<ICrewRunner, CrewRunner>();
 
 var app = builder.Build();
@@ -31,27 +19,33 @@ app.UseStaticFiles();
 
 var api = app.MapGroup("/api");
 
-// Read-only config status so the UI can verify the server is set up. Keys are configured via HA
-// add-on options / env — never through the UI — so only their presence is reported, never the value.
-api.MapGet("/config", () =>
+// Resolved, read-only status (no secrets) — handy for quick checks.
+api.MapGet("/config", (SettingsStore settings) =>
 {
-    var llm = AgentEnvironment.TryReadLlmOptions();
-    var mcpUrl = Environment.GetEnvironmentVariable("TRADING_MCP_URL") ?? "http://localhost:8080/mcp";
-    var bearerSet = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TRADING_BEARER_TOKEN"));
+    var llm = settings.ResolveLlm();
+    var (mcpUrl, bearer) = settings.ResolveMcp();
     return Results.Json(new
     {
         llmConfigured = llm is not null,
         provider = llm?.Provider.ToString(),
         model = llm?.Model,
-        mcpUrl,
-        mcpBearerSet = bearerSet,
+        mcpUrl = mcpUrl.ToString(),
+        mcpBearerSet = !string.IsNullOrWhiteSpace(bearer),
     });
 });
 
-api.MapGet("/status", (DataMcpClient mcp, CancellationToken ct) => Proxy(() => mcp.GetStatusAsync(ct)));
-api.MapGet("/balances", (DataMcpClient mcp, CancellationToken ct) => Proxy(() => mcp.GetBalancesAsync(ct)));
-api.MapPost("/execute", (ExecuteRequest req, DataMcpClient mcp, CancellationToken ct) =>
-    Proxy(() => mcp.SubmitIntentAsync(
+// Editable settings. GET masks secrets (set + last4); POST applies a patch (null fields unchanged).
+api.MapGet("/settings", (SettingsStore settings) => Results.Json(SettingsDto.From(settings)));
+api.MapPost("/settings", (SettingsUpdate update, SettingsStore settings) =>
+{
+    settings.Update(update);
+    return Results.Json(SettingsDto.From(settings));
+});
+
+api.MapGet("/status", (McpClientProvider mcp, CancellationToken ct) => Proxy(() => mcp.Create().GetStatusAsync(ct)));
+api.MapGet("/balances", (McpClientProvider mcp, CancellationToken ct) => Proxy(() => mcp.Create().GetBalancesAsync(ct)));
+api.MapPost("/execute", (ExecuteRequest req, McpClientProvider mcp, CancellationToken ct) =>
+    Proxy(() => mcp.Create().SubmitIntentAsync(
         req.Symbol ?? "BTCUSDT",
         req.Action ?? "hold",
         req.SizeFraction,
